@@ -65,57 +65,84 @@ async def create_case(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Create a walk-in case.  Looks up patient by phone/name first.
-    If no match and new_patient is provided, creates the patient automatically.
+    Create a walk-in case.
+    Path A: patient_id provided → use directly (patient already confirmed in UI).
+    Path B: lookup by phone/name → use match or create new patient.
     """
+    from uuid import UUID as PyUUID
     patient_repo = PatientRepository(db)
     is_new = False
+    patient = None
 
-    # 1. Attempt lookup
-    patient = await _lookup_patient(db, current_doctor.id, data.lookup)
-
-    # 2. No match — must have new_patient payload
-    if not patient:
-        if not data.new_patient:
-            raise HTTPException(
-                status_code=422,
-                detail="No matching patient found. Provide new_patient details to register.",
+    # ── Path A: patient_id already known ──────────────────────────────────────
+    if data.patient_id:
+        result = await db.execute(
+            select(Patient).where(
+                and_(
+                    Patient.id == data.patient_id,
+                    Patient.doctor_id == current_doctor.id,
+                    Patient.is_deleted == False,
+                )
             )
-        np = data.new_patient
-        patient_number = await patient_repo.generate_patient_number(current_doctor.id)
-
-        # Build DOB from age if only age provided
-        dob = np.date_of_birth
-        if not dob and np.age:
-            from datetime import date
-            approx_year = datetime.now().year - np.age
-            dob = str(date(approx_year, 1, 1))
-
-        patient = await patient_repo.create(
-            doctor_id=current_doctor.id,
-            first_name=np.first_name,
-            last_name=np.last_name,
-            phone=np.phone,
-            date_of_birth=dob,
-            gender=np.gender,
-            blood_group=np.blood_group,
-            allergies=np.allergies,
-            chronic_conditions=np.chronic_conditions,
-            patient_number=patient_number,
         )
-        is_new = True
+        patient = result.scalar_one_or_none()
+        if not patient:
+            raise HTTPException(status_code=404, detail="Patient not found")
 
-    # 3. Create the medical record (case)
+    # ── Path B: lookup / create ───────────────────────────────────────────────
+    else:
+        if data.lookup:
+            patient = await _lookup_patient(db, current_doctor.id, data.lookup)
+
+        if not patient:
+            if not data.new_patient:
+                raise HTTPException(
+                    status_code=422,
+                    detail="No matching patient found. Provide new_patient details to register.",
+                )
+            np = data.new_patient
+            patient_number = await patient_repo.generate_patient_number(current_doctor.id)
+
+            dob = np.date_of_birth
+            if not dob and np.age:
+                from datetime import date
+                approx_year = datetime.now().year - np.age
+                dob = str(date(approx_year, 1, 1))
+
+            patient = await patient_repo.create(
+                doctor_id=current_doctor.id,
+                first_name=np.first_name,
+                last_name=np.last_name,
+                phone=np.phone,
+                date_of_birth=dob,
+                gender=np.gender,
+                blood_group=np.blood_group,
+                allergies=np.allergies,
+                chronic_conditions=np.chronic_conditions,
+                patient_number=patient_number,
+            )
+            is_new = True
+
+    # ── Create the medical record ─────────────────────────────────────────────
+    def na(v):
+        """Return 'NA' for blank/None values."""
+        return v if v and v.strip() else "NA"
+
+    # Combine chief_complaint into subjective (MedicalRecord has no separate field for it)
+    cc = na(data.chief_complaint)
+    subj_body = na(data.subjective)
+    combined_subjective = f"Chief Complaint: {cc}\n\n{subj_body}" if cc != "NA" else subj_body
+
     record = MedicalRecord(
         doctor_id=current_doctor.id,
         patient_id=patient.id,
         appointment_id=None,
-        chief_complaint=data.chief_complaint,
-        subjective=data.subjective,
-        objective=data.objective,
-        assessment=data.assessment,
-        plan=data.plan,
-        prescriptions=[p.model_dump() for p in data.prescriptions] if data.prescriptions else None,
+        subjective=combined_subjective,
+        objective="NA",
+        assessment=na(data.assessment),
+        plan=na(data.plan),
+        prescriptions=[p.model_dump() for p in data.prescriptions] if data.prescriptions else [],
+        lab_orders={"follow_up_tests": data.follow_up_tests or "NA"},
         follow_up_days=data.follow_up_days,
     )
     db.add(record)

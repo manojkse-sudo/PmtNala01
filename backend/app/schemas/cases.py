@@ -28,15 +28,18 @@ class PatientCreate(BaseModel):
 class PrescriptionItem(BaseModel):
     drug: str
     dose: str
-    frequency: str
-    duration: str
+    timing: str = "After food"   # Before food / After food / With food / Empty stomach
+    days: str
     instructions: Optional[str] = None
 
 
 class CaseCreate(BaseModel):
-    # Patient identification (lookup or new)
-    lookup: PatientLookup
-    new_patient: Optional[PatientCreate] = None  # provided when no match found
+    # Option A: pass known patient_id directly (existing patient already confirmed in UI)
+    patient_id: Optional[UUID] = None
+
+    # Option B: lookup/create patient
+    lookup: Optional[PatientLookup] = None
+    new_patient: Optional[PatientCreate] = None
 
     # Case / consultation details
     chief_complaint: Optional[str] = None
@@ -45,6 +48,7 @@ class CaseCreate(BaseModel):
     assessment: Optional[str] = None
     plan: Optional[str] = None
     prescriptions: Optional[List[PrescriptionItem]] = None
+    follow_up_tests: Optional[str] = None   # free-text for lab tests / scans
     follow_up_days: Optional[int] = None
 
 

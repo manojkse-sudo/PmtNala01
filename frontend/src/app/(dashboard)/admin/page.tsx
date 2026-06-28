@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { extractApiError, formatDate } from "@/lib/utils";
 import {
-  ShieldCheck, Users, Toggle, UserPlus, Check, X as XIcon,
+  ShieldCheck, Users, SlidersHorizontal, UserPlus, Check, X as XIcon,
   Power, PowerOff, RefreshCcw, AlertCircle,
 } from "lucide-react";
 
@@ -178,7 +178,7 @@ export default function AdminPage() {
         <Card>
           <div className="flex items-center justify-between mb-1">
             <CardTitle className="flex items-center gap-2">
-              <Toggle className="h-4 w-4 text-primary" /> Module Visibility
+              <SlidersHorizontal className="h-4 w-4 text-primary" /> Module Visibility
             </CardTitle>
             {settingsSaved && (
               <span className="text-xs text-green-600 flex items-center gap-1">

@@ -234,8 +234,17 @@ export interface PatientMatch {
   date_of_birth?: string;
 }
 
+export interface PrescriptionRow {
+  drug: string;
+  dose: string;
+  timing: string;   // "Before food" | "After food" | "With food" | "Empty stomach"
+  days: string;
+  instructions?: string;
+}
+
 export interface CaseCreate {
-  lookup: PatientLookup;
+  patient_id?: string;           // pass when patient already selected in UI
+  lookup?: PatientLookup;
   new_patient?: {
     first_name: string;
     last_name: string;
@@ -249,10 +258,10 @@ export interface CaseCreate {
   };
   chief_complaint?: string;
   subjective?: string;
-  objective?: string;
   assessment?: string;
   plan?: string;
-  prescriptions?: Array<{ drug: string; dose: string; frequency: string; duration: string; instructions?: string }>;
+  prescriptions?: PrescriptionRow[];
+  follow_up_tests?: string;
   follow_up_days?: number;
 }
 
