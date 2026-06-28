@@ -21,6 +21,7 @@ class Doctor(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     clinic_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     clinic_address: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     timezone: Mapped[str] = mapped_column(String(50), default="UTC", nullable=False)
 

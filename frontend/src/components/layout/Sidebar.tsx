@@ -4,29 +4,70 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, Calendar, FileText,
   Settings, LogOut, ChevronLeft, ChevronRight,
-  Stethoscope, X
+  Stethoscope, X, FilePlus, Package, ShieldCheck,
 } from "lucide-react";
 import { cn, getInitials } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth";
 import { useUIStore } from "@/store/ui";
+import { useSettingsStore } from "@/store/settings";
 import { useRouter } from "next/navigation";
 
-const NAV = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Patients", href: "/patients", icon: Users },
-  { label: "Appointments", href: "/appointments", icon: Calendar },
-  { label: "Records", href: "/records", icon: FileText },
+// Nav items visible to every authenticated doctor
+const DOCTOR_NAV = [
+  { label: "Dashboard",   href: "/dashboard",   icon: LayoutDashboard },
+  { label: "Create Case", href: "/cases/new",   icon: FilePlus },
+  { label: "Patients",    href: "/patients",    icon: Users },
+];
+
+// Optional items controlled by admin feature flags
+const OPTIONAL_NAV: Array<{ label: string; href: string; icon: React.ElementType; moduleKey: string }> = [
+  { label: "Appointments", href: "/appointments", icon: Calendar,  moduleKey: "module_appointments" },
+  { label: "Inventory",    href: "/inventory",    icon: Package,   moduleKey: "module_inventory" },
+];
+
+// Admin-only nav
+const ADMIN_NAV = [
+  { label: "Admin Console", href: "/admin", icon: ShieldCheck },
 ];
 
 const BOTTOM_NAV = [
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 
-function SidebarContent({ collapsed, onClose }: { collapsed: boolean; onClose?: () => void }) {
+function NavLink({
+  href, label, icon: Icon, collapsed, onClick,
+}: {
+  href: string; label: string; icon: React.ElementType; collapsed: boolean; onClick?: () => void;
+}) {
   const pathname = usePathname();
+  const active = pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
+  return (
+    <Link
+      href={href}
+      onClick={onClick}
+      className={cn(
+        "flex items-center gap-3 h-9 px-2.5 rounded-lg text-sm font-medium",
+        "transition-colors duration-100",
+        active
+          ? "bg-white/15 text-white"
+          : "text-primary-200 hover:bg-white/10 hover:text-white",
+        collapsed && "justify-center px-0"
+      )}
+      title={collapsed ? label : undefined}
+    >
+      <Icon className="h-4 w-4 flex-shrink-0" />
+      {!collapsed && <span className="truncate">{label}</span>}
+    </Link>
+  );
+}
+
+function SidebarContent({ collapsed, onClose }: { collapsed: boolean; onClose?: () => void }) {
   const { doctor, logout } = useAuthStore();
   const { toggleSidebar } = useUIStore();
+  const { modules } = useSettingsStore();
   const router = useRouter();
+
+  const isAdmin = doctor?.is_admin ?? false;
 
   const handleLogout = () => {
     logout();
@@ -54,7 +95,6 @@ function SidebarContent({ collapsed, onClose }: { collapsed: boolean; onClose?: 
           </div>
         )}
 
-        {/* Desktop collapse toggle (when open) */}
         {!collapsed && !onClose && (
           <button
             onClick={toggleSidebar}
@@ -63,8 +103,6 @@ function SidebarContent({ collapsed, onClose }: { collapsed: boolean; onClose?: 
             <ChevronLeft className="h-4 w-4" />
           </button>
         )}
-
-        {/* Mobile close button */}
         {onClose && (
           <button
             onClick={onClose}
@@ -75,7 +113,6 @@ function SidebarContent({ collapsed, onClose }: { collapsed: boolean; onClose?: 
         )}
       </div>
 
-      {/* Desktop collapse toggle (when closed) */}
       {collapsed && !onClose && (
         <button
           onClick={toggleSidebar}
@@ -87,28 +124,30 @@ function SidebarContent({ collapsed, onClose }: { collapsed: boolean; onClose?: 
 
       {/* Nav */}
       <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
-        {NAV.map(({ label, href, icon: Icon }) => {
-          const active = pathname.startsWith(href);
-          return (
-            <Link
-              key={href}
-              href={href}
-              onClick={onClose}
-              className={cn(
-                "flex items-center gap-3 h-9 px-2.5 rounded-lg text-sm font-medium",
-                "transition-colors duration-100",
-                active
-                  ? "bg-white/15 text-white"
-                  : "text-primary-200 hover:bg-white/10 hover:text-white",
-                collapsed && "justify-center px-0"
-              )}
-              title={collapsed ? label : undefined}
-            >
-              <Icon className="h-4 w-4 flex-shrink-0" />
-              {!collapsed && <span className="truncate">{label}</span>}
-            </Link>
-          );
-        })}
+        {/* Core doctor nav */}
+        {DOCTOR_NAV.map(({ label, href, icon }) => (
+          <NavLink key={href} href={href} label={label} icon={icon} collapsed={collapsed} onClick={onClose} />
+        ))}
+
+        {/* Optional module nav (admin-toggled) */}
+        {OPTIONAL_NAV.filter(({ moduleKey }) => modules[moduleKey] !== false).map(({ label, href, icon }) => (
+          <NavLink key={href} href={href} label={label} icon={icon} collapsed={collapsed} onClick={onClose} />
+        ))}
+
+        {/* Admin-only section */}
+        {isAdmin && (
+          <>
+            {!collapsed && (
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-primary-400 px-2.5 pt-3 pb-1">
+                Admin
+              </p>
+            )}
+            {collapsed && <div className="border-t border-primary-600 my-2" />}
+            {ADMIN_NAV.map(({ label, href, icon }) => (
+              <NavLink key={href} href={href} label={label} icon={icon} collapsed={collapsed} onClick={onClose} />
+            ))}
+          </>
+        )}
       </nav>
 
       {/* Bottom */}
@@ -154,7 +193,9 @@ function SidebarContent({ collapsed, onClose }: { collapsed: boolean; onClose?: 
             {!collapsed && (
               <div className="min-w-0">
                 <p className="text-xs font-medium text-white truncate">{doctor.full_name}</p>
-                <p className="text-[11px] text-primary-300 truncate">{doctor.specialty || "General"}</p>
+                <p className="text-[11px] text-primary-300 truncate">
+                  {isAdmin ? "Admin" : (doctor.specialty || "General")}
+                </p>
               </div>
             )}
           </div>
