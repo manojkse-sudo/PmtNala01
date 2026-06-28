@@ -9,10 +9,13 @@ interface Toast {
 
 interface UIState {
   sidebarOpen: boolean;
+  mobileSidebarOpen: boolean;
   toasts: Toast[];
 
   toggleSidebar: () => void;
   setSidebarOpen: (open: boolean) => void;
+  toggleMobileSidebar: () => void;
+  setMobileSidebarOpen: (open: boolean) => void;
 
   addToast: (toast: Omit<Toast, "id">) => void;
   removeToast: (id: string) => void;
@@ -20,10 +23,13 @@ interface UIState {
 
 export const useUIStore = create<UIState>((set) => ({
   sidebarOpen: true,
+  mobileSidebarOpen: false,
   toasts: [],
 
   toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
+  toggleMobileSidebar: () => set((s) => ({ mobileSidebarOpen: !s.mobileSidebarOpen })),
+  setMobileSidebarOpen: (open) => set({ mobileSidebarOpen: open }),
 
   addToast: (toast) => {
     const id = Math.random().toString(36).slice(2);
